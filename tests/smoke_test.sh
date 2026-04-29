@@ -71,10 +71,17 @@ echo "smoke_test: GET /api/datasources/name/$DS_NAME"
 get_body=$("${KCTL[@]}" -n "$NS" exec grafana-curl -- \
     curl -s "http://${GRAFANA_HOST}/api/datasources/name/${DS_NAME}")
 
-# Round-trip: name + type both came back.
+# Round-trip:
+#   - `name` echoes back exactly as we sent it.
+#   - `type` is reported as Grafana's *canonical plugin ID*. Grafana
+#     accepts the short alias `testdata` on POST but stores +
+#     normalizes it to `grafana-testdata-datasource` (the plugin's
+#     fully-qualified name). Either form is correct end-to-end behavior;
+#     assert on the canonical name since that's what consumers see in
+#     the GET response.
 failed=0
-grep -q "\"name\": *\"${DS_NAME}\"" <<<"$get_body" || { echo "smoke_test: missing name" >&2; failed=1; }
-grep -q "\"type\": *\"testdata\""    <<<"$get_body" || { echo "smoke_test: missing type" >&2; failed=1; }
+grep -q "\"name\":\s*\"${DS_NAME}\""                   <<<"$get_body" || { echo "smoke_test: missing name" >&2; failed=1; }
+grep -q "\"type\":\s*\"grafana-testdata-datasource\""  <<<"$get_body" || { echo "smoke_test: missing type" >&2; failed=1; }
 
 if (( failed )); then
   echo "---- response ----" >&2
