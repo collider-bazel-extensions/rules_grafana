@@ -1,0 +1,51 @@
+# Render-time values for rules_grafana's pinned manifest.
+#
+# Mode: minimal smoke-test footprint. One Deployment replica, sqlite in
+# emptyDir (no PVC, no migration concerns), no plugins, anonymous auth
+# enabled with Admin role so the smoke can POST datasources without
+# resolving the admin secret.
+#
+# Real production deployments will override most of this — auth, real
+# storage, plugins, datasources, dashboards.
+
+replicas: 1
+
+# sqlite is the chart's default; we just want it in an emptyDir Volume so
+# CI doesn't need a PVC provisioner. The chart's `persistence.enabled:
+# false` already gives us this; explicit for clarity.
+persistence:
+  enabled: false
+
+# Anonymous-Admin so the smoke test POSTs to /api/datasources without
+# auth headers. NEVER do this in production. Ours is a sealed kind
+# cluster used for one assertion — acceptable.
+grafana.ini:
+  auth.anonymous:
+    enabled: true
+    org_role: Admin
+    org_name: Main Org.
+  # Loosen the analytics dial — Grafana otherwise reaches out to
+  # grafana.com on startup which (a) slows the test and (b) needs
+  # outbound network.
+  analytics:
+    reporting_enabled: false
+    check_for_updates: false
+    check_for_plugin_updates: false
+
+# No plugins in the test image — the chart pre-pulls them via initContainer
+# which would add wall-clock time and a network dependency.
+plugins: []
+
+# RBAC + ServiceAccount + Service + Deployment are on by default; that's
+# what we want.
+
+# `testFramework` is a chart-internal smoke test that runs `helm test` —
+# disable to keep our manifest lean.
+testFramework:
+  enabled: false
+
+# The Service exposes port 80 by default with targetPort 3000 (Grafana
+# proper). Leave that — the smoke pod hits Service:80.
+service:
+  type: ClusterIP
+  port: 80

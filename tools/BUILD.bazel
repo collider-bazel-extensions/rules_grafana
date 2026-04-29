@@ -1,0 +1,26 @@
+"""Maintainer-only render flow."""
+
+load("@rules_helm//:defs.bzl", "helm_template")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+
+# ---- 10.5.15 ----------------------------------------------------------------
+
+helm_template(
+    name = "render_grafana_10_5_15",
+    chart = ["@grafana_chart_10_5_15//:files"],
+    values = ["//config:grafana-values.yaml"],
+    namespace = "grafana",
+    release_name = "grafana",
+    include_crds = True,
+)
+
+sh_binary(
+    name = "render_writeback_10_5_15",
+    srcs = ["writeback.sh"],
+    data = [":render_grafana_10_5_15"],
+    args = [
+        "$(rootpath :render_grafana_10_5_15)",
+        "private/manifests/grafana.yaml",
+    ],
+    visibility = ["//visibility:public"],
+)

@@ -1,0 +1,80 @@
+"""Tests for rules_grafana.
+
+- Analysis test verifies the macro instantiates cleanly.
+- Smoke test composes a real kind cluster + Grafana via the rule under
+  test, then runs an in-cluster `curl` pod that POSTs a `testdata`
+  datasource to /api/datasources, GETs it back via /api/datasources/name/<name>,
+  and asserts the round-trip — proving Grafana's API and sqlite
+  persistence both work.
+"""
+
+load("@rules_grafana//:defs.bzl", "grafana_health_check", "grafana_install")
+load("@rules_itest//:itest.bzl", "itest_service", "service_test")
+load("@rules_kind//:defs.bzl", "kind_cluster", "kind_health_check")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
+load(":analysis_tests.bzl", "grafana_install_test_suite")
+
+# ---- analysis ---------------------------------------------------------------
+
+grafana_install_test_suite(name = "grafana_install_analysis")
+
+# ---- smoke composition ------------------------------------------------------
+
+kind_cluster(name = "cluster", k8s_version = "1.32")
+
+kind_health_check(name = "cluster_health", cluster = ":cluster")
+
+itest_service(
+    name = "kind_svc",
+    exe = ":cluster",
+    health_check = ":cluster_health",
+    tags = ["manual"],
+)
+
+grafana_install(
+    name = "grafana_install_bin",
+    tags = ["manual"],
+)
+
+grafana_health_check(
+    name = "grafana_health_bin",
+    tags = ["manual"],
+)
+
+sh_binary(
+    name = "grafana_install_wrapper",
+    srcs = ["install_wrapper.sh"],
+    data = [":grafana_install_bin"],
+)
+
+sh_binary(
+    name = "grafana_health_wrapper",
+    srcs = ["health_wrapper.sh"],
+    data = [":grafana_health_bin"],
+)
+
+itest_service(
+    name = "grafana_svc",
+    exe = ":grafana_install_wrapper",
+    deps = [":kind_svc"],
+    health_check = ":grafana_health_wrapper",
+    tags = ["manual"],
+)
+
+sh_test(
+    name = "smoke_test_bin",
+    srcs = ["smoke_test.sh"],
+    tags = ["manual"],
+)
+
+service_test(
+    name = "smoke_test",
+    services = [":grafana_svc"],
+    test = ":smoke_test_bin",
+    tags = [
+        "manual",
+        "no-sandbox",
+        "requires-network",
+    ],
+)
