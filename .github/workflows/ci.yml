@@ -37,7 +37,7 @@ jobs:
           if-no-files-found: ignore
 
   smoke:
-    # End-to-end: kind cluster (k8s 1.32) + Grafana install + in-cluster
+    # End-to-end: kind cluster (k8s 1.35) + Grafana install + in-cluster
     # curl pod that round-trips a `testdata` datasource through Grafana's
     # /api/datasources to prove API + sqlite persistence work.
     name: smoke (ubuntu-latest, docker)
